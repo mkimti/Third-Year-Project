@@ -11,6 +11,37 @@ from nltk.metrics.distance import jaccard_distance
 from nltk.util import ngrams
 from nltk.corpus import words
 
+PATH = 'Fantasy-Premier-League/data'
+
+def createPlayersTable(conn):
+    c = conn.cursor()
+    c.execute("""CREATE TABLE players (
+        playerId INTEGER NOT NULL PRIMARY KEY,
+        firstname TEXT,
+        lastname TEXT,
+        playerGitId INTEGER
+    )""")
+
+    conn.commit()
+
+def createPlayersTweetsTable(conn):
+    c = conn.cursor()
+    c.execute("""CREATE TABLE playersTweets (
+        tweetId INTEGER NOT NULL PRIMARY KEY,
+        FOREIGN KEY (playerId) REFERENCES players (playerId)
+        gameweek INTEGER,
+        tweet TEXT
+    )""")
+
+
+def populatePlayersTable(conn):
+    c = conn.cursor()
+    current_df = pd.read_csv(PATH + '/2021-22/player_idlist.csv')
+    for i in current_df.index:
+        temp_id = int(current_df.id[i])
+        with conn:
+            c.execute("INSERT INTO players VALUES (NULL, ?, ?, ?)", (current_df.first_name[i], current_df.second_name[i], temp_id))
+
 def create_connection(db_file):
     conn = None
     try:
@@ -72,27 +103,15 @@ def cleanTweet(tweet):
 
 
 def main():
-    query = "Ronaldo min_faves:500 lang:en"
-    limit = 1
+    #query = "Ronaldo min_faves:500 lang:en"
+    #limit = 1
+    conn = create_connection('fpl.db')
 
-    retrieveTweets(query, limit)
+    #retrieveTweets(query, limit)
+    createPlayersTable(conn)
+    populatePlayersTable(conn)
 
-    '''conn = create_connection('fpl.db')
-    c = conn.cursor()
-    c.execute("""CREATE TABLE players (
-        playerId INTEGER NOT NULL PRIMARY KEY,
-        firstname TEXT,
-        lastname TEXT
-    )""")
-
-    conn.commit()
-
-    c.execute("""CREATE TABLE playersTweets (
-        tweetId INTEGER NOT NULL PRIMARY KEY,
-        FOREIGN KEY (playerId) REFERENCES players (playerId)
-        gameweek INTEGER,
-        tweet TEXT
-    )""")"""'''
+    #createPlayersTweetsTable(conn)
 
 
 
