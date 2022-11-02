@@ -43,14 +43,14 @@ def populatePlayersTable(conn):
 
 def populatePlayersTweetsTable(conn):
     c = conn.cursor()
-    for i in range(1,2):
+    for i in range(2,3):
         dataframe1 = pd.read_csv(PATH + '/2021-22/gws/gw' + str(i) + '.csv')
         dataframe2 = pd.read_csv(PATH + '/2021-22/gws/gw' + str(i+1) + '.csv')
         tempEarliestDay = int(dataframe2.kickoff_time[0][8:10])
         for k in dataframe2.index:
             if int(dataframe2.kickoff_time[k][8:10]) < tempEarliestDay:
                 tempEarliestDay = int(dataframe2.kickoff_time[k][8:10])
-        toDate = dataframe2.kickoff_time[0][0:8] + str(tempEarliestDay)
+        toDate = dataframe2.kickoff_time[0][0:8] + str(tempEarliestDay-1)
         for j in dataframe1.index:
             if dataframe1.minutes[j] > 0:
                 limit = math.floor(dataframe1.influence[j]) * 10
@@ -134,7 +134,7 @@ def main():
     #createPlayersTable(conn)
     #populatePlayersTable(conn)
 
-    createPlayersTweetsTable(conn)
+    #createPlayersTweetsTable(conn)
     populatePlayersTweetsTable(conn)
 
 
