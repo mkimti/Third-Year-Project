@@ -7,9 +7,7 @@ from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
 import contractions
-from nltk.metrics.distance import jaccard_distance
-from nltk.util import ngrams
-from nltk.corpus import words
+import math
 
 PATH = 'Fantasy-Premier-League/data'
 
@@ -17,8 +15,8 @@ def createPlayersTable(conn):
     c = conn.cursor()
     c.execute("""CREATE TABLE players (
         playerId INTEGER NOT NULL PRIMARY KEY,
-        firstname TEXT,
-        lastname TEXT,
+        fplName TEXT,
+        name TEXT,
         playerGitId INTEGER
     )""")
 
@@ -28,7 +26,7 @@ def createPlayersTweetsTable(conn):
     c = conn.cursor()
     c.execute("""CREATE TABLE playersTweets (
         tweetId INTEGER NOT NULL PRIMARY KEY,
-        FOREIGN KEY (playerId) REFERENCES players (playerId)
+        playerId INTEGER,
         gameweek INTEGER,
         tweet TEXT
     )""")
@@ -36,11 +34,39 @@ def createPlayersTweetsTable(conn):
 
 def populatePlayersTable(conn):
     c = conn.cursor()
-    current_df = pd.read_csv(PATH + '/2021-22/player_idlist.csv')
-    for i in current_df.index:
-        temp_id = int(current_df.id[i])
+    dataframe = pd.read_csv(PATH + '/2021-22/id_dict.csv')
+    dataframe = dataframe.rename(columns={' FPL_ID': 'FPL_ID', ' FPL_Name': 'FPL_Name', ' Understat_Name': 'Understat_Name'})
+    for i in dataframe.index:
+        temp_id = int(dataframe.FPL_ID[i])
         with conn:
-            c.execute("INSERT INTO players VALUES (NULL, ?, ?, ?)", (current_df.first_name[i], current_df.second_name[i], temp_id))
+            c.execute("INSERT INTO players VALUES (NULL, ?, ?, ?)", (dataframe.FPL_Name[i], dataframe.Understat_Name[i], temp_id))
+
+def populatePlayersTweetsTable(conn):
+    c = conn.cursor()
+    for i in range(1,2):
+        dataframe1 = pd.read_csv(PATH + '/2021-22/gws/gw' + str(i) + '.csv')
+        dataframe2 = pd.read_csv(PATH + '/2021-22/gws/gw' + str(i+1) + '.csv')
+        tempEarliestDay = int(dataframe2.kickoff_time[0][8:10])
+        for k in dataframe2.index:
+            if int(dataframe2.kickoff_time[k][8:10]) < tempEarliestDay:
+                tempEarliestDay = int(dataframe2.kickoff_time[k][8:10])
+        toDate = dataframe2.kickoff_time[0][0:8] + str(tempEarliestDay)
+        for j in dataframe1.index:
+            if dataframe1.minutes[j] > 0:
+                limit = math.floor(dataframe1.influence[j]) * 10
+                fromDate = dataframe1.kickoff_time[j][0:10]
+                FPLName = dataframe1.name[j]
+                with conn:
+                    c.execute("SELECT name FROM players WHERE FPLName=?", (FPLName,))
+                    name = c.fetchone()[0]
+                query = name + " lang:en until:" + toDate + " since:" + fromDate + " -filter:replies"
+                tweets = retrieveTweets(query, limit)
+                with conn:
+                    c.execute("SELECT playerId FROM players WHERE FPLName=?", (FPLName,))
+                    tempPlayerId = c.fetchone()[0]
+                for tweet in tweets:
+                    with conn:
+                        c.execute("INSERT INTO playersTweets VALUES (NULL, ?, ?, ?)", (tempPlayerId, i, tweet))
 
 def create_connection(db_file):
     conn = None
@@ -53,12 +79,15 @@ def create_connection(db_file):
 
 def retrieveTweets(q, l):
     tweetsCount = 0
+    tweets = []
     for tweet in sntwitter.TwitterSearchScraper(q).get_items():
         if (tweetsCount == l):
             break
         else: 
-            cleanTweet(tweet.content)
+            tweets.append(cleanTweet(tweet.content))
             tweetsCount+=1
+
+    return tweets
 
 #Expand Contractions
 def expandContractions(text):
@@ -89,7 +118,6 @@ def stemming(text):
 
 
 def cleanTweet(tweet):
-    print(tweet) 
 
     new_text = expandContractions(tweet)
     lower_text = toLowerCase(new_text)
@@ -98,20 +126,16 @@ def cleanTweet(tweet):
     without_stopwords = removeStopwords(alphabetic_only)
     stemmed_text = stemming(without_stopwords)
 
-    print(stemmed_text)
-    print(' '.join(stemmed_text))
+    return ' '.join(stemmed_text)
 
 
 def main():
-    #query = "Ronaldo min_faves:500 lang:en"
-    #limit = 1
     conn = create_connection('fpl.db')
+    #createPlayersTable(conn)
+    #populatePlayersTable(conn)
 
-    #retrieveTweets(query, limit)
-    createPlayersTable(conn)
-    populatePlayersTable(conn)
-
-    #createPlayersTweetsTable(conn)
+    createPlayersTweetsTable(conn)
+    populatePlayersTweetsTable(conn)
 
 
 
