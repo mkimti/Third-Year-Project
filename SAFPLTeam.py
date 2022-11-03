@@ -46,7 +46,7 @@ def populatePlayersTable(conn):
 
 def populatePlayersTweetsTable(conn):
     c = conn.cursor()
-    for i in range(8,11):
+    for i in range(12,20):
         dataframe1 = pd.read_csv(PATH + '/2021-22/gws/gw' + str(i) + '.csv')
         dataframe2 = pd.read_csv(PATH + '/2021-22/gws/gw' + str(i+1) + '.csv')
         tempEarliestDay = int(dataframe2.kickoff_time[0][8:10])
