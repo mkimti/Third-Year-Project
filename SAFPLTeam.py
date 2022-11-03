@@ -46,7 +46,7 @@ def populatePlayersTable(conn):
 
 def populatePlayersTweetsTable(conn):
     c = conn.cursor()
-    for i in range(5,6):
+    for i in range(6,7):
         dataframe1 = pd.read_csv(PATH + '/2021-22/gws/gw' + str(i) + '.csv')
         dataframe2 = pd.read_csv(PATH + '/2021-22/gws/gw' + str(i+1) + '.csv')
         tempEarliestDay = int(dataframe2.kickoff_time[0][8:10])
@@ -122,8 +122,8 @@ def stemming(text):
 
 def cleanTweet(tweet):
 
-    new_text = expandContractions(tweet)
-    lower_text = toLowerCase(new_text)
+    #new_text = expandContractions(tweet)
+    lower_text = toLowerCase(tweet)
     tokenized_text = tokenization(lower_text)
     alphabetic_only = alphabetOnly(tokenized_text)
     without_stopwords = removeStopwords(alphabetic_only)
