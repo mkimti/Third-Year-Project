@@ -8,6 +8,7 @@ from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
 import contractions
 import math
+from unidecode import unidecode
 
 PATH = 'Fantasy-Premier-League/data'
 
@@ -38,12 +39,14 @@ def populatePlayersTable(conn):
     dataframe = dataframe.rename(columns={' FPL_ID': 'FPL_ID', ' FPL_Name': 'FPL_Name', ' Understat_Name': 'Understat_Name'})
     for i in dataframe.index:
         temp_id = int(dataframe.FPL_ID[i])
+        fpl_name_without_accents = unidecode(dataframe.FPL_Name[i], errors='strict')
+        name_without_accents = unidecode(dataframe.Understat_Name[i], errors='strict')
         with conn:
-            c.execute("INSERT INTO players VALUES (NULL, ?, ?, ?)", (dataframe.FPL_Name[i], dataframe.Understat_Name[i], temp_id))
+            c.execute("INSERT INTO players VALUES (NULL, ?, ?, ?)", (fpl_name_without_accents, name_without_accents, temp_id))
 
 def populatePlayersTweetsTable(conn):
     c = conn.cursor()
-    for i in range(4,5):
+    for i in range(5,6):
         dataframe1 = pd.read_csv(PATH + '/2021-22/gws/gw' + str(i) + '.csv')
         dataframe2 = pd.read_csv(PATH + '/2021-22/gws/gw' + str(i+1) + '.csv')
         tempEarliestDay = int(dataframe2.kickoff_time[0][8:10])
@@ -55,7 +58,7 @@ def populatePlayersTweetsTable(conn):
             if dataframe1.minutes[j] > 0:
                 limit = math.floor(dataframe1.influence[j]) * 10
                 fromDate = dataframe1.kickoff_time[j][0:10]
-                FPLName = dataframe1.name[j]
+                FPLName = unidecode(dataframe1.name[j], errors='strict')
                 with conn:
                     c.execute("SELECT name FROM players WHERE FPLName=?", (FPLName,))
                     name = c.fetchone()[0]
