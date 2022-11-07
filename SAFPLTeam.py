@@ -57,6 +57,9 @@ def createPlayersTweetsInitialTeam(conn):
 
     conn.commit()
 
+#def populatePlayersTweetsInitialTeam(conn):
+
+
 def populatePlayersTable(conn):
     c = conn.cursor()
     dataframe = pd.read_csv(PATH + '/2021-22/id_dict.csv')
@@ -227,5 +230,6 @@ def main():
     #populatePlayersSumInitialTeamTable(conn)
 
     #createPlayersTweetsInitialTeam(conn)
+    #populatePlayersTweetsInitialTeam(conn)
 
 main()
