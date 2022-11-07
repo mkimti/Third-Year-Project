@@ -57,8 +57,34 @@ def createPlayersTweetsInitialTeam(conn):
 
     conn.commit()
 
-#def populatePlayersTweetsInitialTeam(conn):
+def populatePlayersTweetsInitialTeam(conn):
+    c = conn.cursor()
+    with conn:
+        c.execute("SELECT playerId, name FROM players")
+    result = c.fetchall()
+    
+    fromDate = "2021-05-22"
+    toDate = "2021-08-12"
 
+    for tuple in result:
+        worked = False
+        id = tuple[0]
+        name = tuple[1]
+        c.execute("SELECT ictIndexSum FROM playersSumInitialTeam WHERE pID=?", (id,))
+        try:
+           ictIndexSum = c.fetchone()[0] 
+           worked = True
+        except:
+            worked = False
+
+        if (worked == True):
+            limit = math.ceil(ictIndexSum)
+            query = name + " lang:en until:" + toDate + " since:" + fromDate + " -filter:replies"
+            print(query)
+            tweets = retrieveTweets(query, limit)
+            for tweet in tweets:
+                with conn:
+                    c.execute("INSERT INTO playersTweetsInitialTeam VALUES (NULL, ?, ?)", (id, tweet))
 
 def populatePlayersTable(conn):
     c = conn.cursor()
@@ -196,8 +222,8 @@ def cleanTweet(tweet):
     lower_text = toLowerCase(tweet)
     tokenized_text = tokenization(lower_text)
     alphabetic_only = alphabetOnly(tokenized_text)
-    #without_stopwords = removeStopwords(alphabetic_only)
-    stemmed_text = stemming(alphabetic_only)
+    without_stopwords = removeStopwords(alphabetic_only)
+    stemmed_text = stemming(without_stopwords)
 
     return ' '.join(stemmed_text)
 
@@ -230,6 +256,6 @@ def main():
     #populatePlayersSumInitialTeamTable(conn)
 
     #createPlayersTweetsInitialTeam(conn)
-    #populatePlayersTweetsInitialTeam(conn)
+    populatePlayersTweetsInitialTeam(conn)
 
 main()
