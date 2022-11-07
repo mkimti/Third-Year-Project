@@ -9,8 +9,22 @@ from nltk.stem.porter import PorterStemmer
 import contractions
 import math
 from unidecode import unidecode
+#from nltk.sentiment.vader import SentimentIntensityAnalyzer
+#from pattern.en import sentiment
+import os
 
 PATH = 'Fantasy-Premier-League/data'
+
+def createPlayersSumInitialTeam(conn):
+    c = conn.cursor()
+    
+    c.execute("""CREATE TABLE playersSumInitialTeam (
+        pID INTEGER,
+        ictIndexSum INTEGER,
+        FOREIGN KEY (pID) REFERENCES players(playerId)
+    )""")
+
+    conn.commit()
 
 def createPlayersTable(conn):
     c = conn.cursor()
@@ -32,6 +46,16 @@ def createPlayersTweetsTable(conn):
         tweet TEXT
     )""")
 
+def createPlayersTweetsInitialTeam(conn):
+    c = conn.cursor()
+    c.execute("""CREATE TABLE playersTweetsInitialTeam (
+        tweetId INTEGER NOT NULL PRIMARY KEY,
+        pID INTEGER,
+        tweet TEXT,
+        FOREIGN KEY (pID) REFERENCES players(playerId)
+    )""")
+
+    conn.commit()
 
 def populatePlayersTable(conn):
     c = conn.cursor()
@@ -46,18 +70,18 @@ def populatePlayersTable(conn):
 
 def populatePlayersTweetsTable(conn):
     c = conn.cursor()
-    for i in range(12,20):
+    for i in range(37,38):
         dataframe1 = pd.read_csv(PATH + '/2021-22/gws/gw' + str(i) + '.csv')
         dataframe2 = pd.read_csv(PATH + '/2021-22/gws/gw' + str(i+1) + '.csv')
-        tempEarliestDay = int(dataframe2.kickoff_time[0][8:10])
-        for k in dataframe2.index:
-            if int(dataframe2.kickoff_time[k][8:10]) < tempEarliestDay:
-                tempEarliestDay = int(dataframe2.kickoff_time[k][8:10])
-        toDate = dataframe2.kickoff_time[0][0:8] + str(tempEarliestDay-1)
         for j in dataframe1.index:
             if dataframe1.minutes[j] > 0:
                 limit = math.floor(dataframe1.influence[j]) * 10
                 fromDate = dataframe1.kickoff_time[j][0:10]
+                team = dataframe1.team[j]
+                for k in dataframe2.index:
+                    if dataframe2.team[k] == team:
+                        toDate = dataframe2.kickoff_time[k][0:10]
+                        break
                 FPLName = unidecode(dataframe1.name[j], errors='strict')
                 with conn:
                     c.execute("SELECT name FROM players WHERE FPLName=?", (FPLName,))
@@ -70,6 +94,49 @@ def populatePlayersTweetsTable(conn):
                 for tweet in tweets:
                     with conn:
                         c.execute("INSERT INTO playersTweets VALUES (NULL, ?, ?, ?)", (tempPlayerId, i, tweet))
+
+def populatePlayersSumInitialTeamTable(conn):
+    c = conn.cursor()
+    dataframe1 = pd.read_csv(PATH + '/2021-22/id_dict.csv')
+    dataframe1 = dataframe1.rename(columns={' FPL_ID': 'FPL_ID', ' FPL_Name': 'FPL_Name', ' Understat_Name': 'Understat_Name'})
+    names = [dataframe1.FPL_Name[i] for i in dataframe1.index]
+
+    for dirname in os.listdir('Fantasy-Premier-League/data/2020-21/players'):
+        f = os.path.join('Fantasy-Premier-League/data/2020-21/players', dirname)
+
+        i = len(f) - 1
+        revid = ""
+
+        while (f[i] != '_'):
+            revid = revid + f[i]
+            i-=1
+        
+        id = revid[::-1]
+
+        dataframe2 = pd.read_csv(PATH + '/2020-21/player_idlist.csv')
+        name = ""
+        for i in dataframe2.index:
+            if (str(dataframe2.id[i]) == str(id)):
+                name = dataframe2.first_name[i] + " " + dataframe2.second_name[i]
+                break
+
+        if (name in names):
+           dataframe3 = pd.read_csv(f+'/history.csv') 
+           for i in dataframe3.index:
+               if dataframe3.season_name[i] == "2020/21":
+                   ict_index_value = dataframe3.ict_index[i]
+                   break
+        
+        if (name in names):
+            temp_name = unidecode(name, errors='strict')  
+            with conn:
+                c.execute("SELECT playerId FROM players WHERE FPLName=?", (temp_name,))
+                tempPlayerId = c.fetchone()[0] 
+                c.execute("INSERT INTO playersSumInitialTeam VALUES (?, ?)", (tempPlayerId, ict_index_value))
+            
+
+
+
 
 def create_connection(db_file):
     conn = None
@@ -126,10 +193,25 @@ def cleanTweet(tweet):
     lower_text = toLowerCase(tweet)
     tokenized_text = tokenization(lower_text)
     alphabetic_only = alphabetOnly(tokenized_text)
-    without_stopwords = removeStopwords(alphabetic_only)
-    stemmed_text = stemming(without_stopwords)
+    #without_stopwords = removeStopwords(alphabetic_only)
+    stemmed_text = stemming(alphabetic_only)
 
     return ' '.join(stemmed_text)
+
+#NLTK Sentiment Analysis
+'''def nltkSA(tweets):
+    score = 0
+    for tweet in tweets:
+        polarity = SentimentIntensityAnalyzer().polarity_scores(tweet)
+        score += polarity['compound']
+    
+    return score/len(tweets)'''
+
+#Pattern Sentiment Analysis
+'''def patternSA(tweets):
+    score = 0
+    for tweet in tweets:
+        polarity = sentiment(tweet)'''
 
 
 def main():
@@ -138,8 +220,12 @@ def main():
     #populatePlayersTable(conn)
 
     #createPlayersTweetsTable(conn)
-    populatePlayersTweetsTable(conn)
+    #populatePlayersTweetsTable(conn)
 
+    #createPlayersSumInitialTeam(conn)
 
+    #populatePlayersSumInitialTeamTable(conn)
+
+    #createPlayersTweetsInitialTeam(conn)
 
 main()
