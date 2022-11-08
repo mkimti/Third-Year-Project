@@ -80,7 +80,6 @@ def populatePlayersTweetsInitialTeam(conn):
         if (worked == True):
             limit = math.ceil(ictIndexSum)
             query = name + " lang:en until:" + toDate + " since:" + fromDate + " -filter:replies"
-            print(query)
             tweets = retrieveTweets(query, limit)
             for tweet in tweets:
                 with conn:
@@ -255,7 +254,7 @@ def main():
 
     #populatePlayersSumInitialTeamTable(conn)
 
-    #createPlayersTweetsInitialTeam(conn)
+    createPlayersTweetsInitialTeam(conn)
     populatePlayersTweetsInitialTeam(conn)
 
 main()
