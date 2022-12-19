@@ -15,6 +15,8 @@ from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from pattern.en import sentiment
 import os
 from textblob import TextBlob
+from pycorenlp import StanfordCoreNLP
+nlp = StanfordCoreNLP('http://localhost:9000')
 
 PATH = 'Fantasy-Premier-League/data'
 
@@ -165,68 +167,6 @@ def populatePlayersSumInitialTeamTable(conn):
                 tempPlayerId = c.fetchone()[0] 
                 c.execute("INSERT INTO playersSumInitialTeam VALUES (?, ?)", (tempPlayerId, ict_index_value))
 
-def check(conn):
-    """c = conn.cursor()
-    newSignings = []
-    dataframe1 = pd.read_csv(PATH + '/2021-22/id_dict.csv')
-    dataframe1 = dataframe1.rename(columns={' FPL_ID': 'FPL_ID', ' FPL_Name': 'FPL_Name', ' Understat_Name': 'Understat_Name'})
-    names = [dataframe1.FPL_Name[i] for i in dataframe1.index]    
-
-    for dirname in os.listdir('Fantasy-Premier-League/data/2020-21/players'):
-        f = os.path.join('Fantasy-Premier-League/data/2020-21/players', dirname)
-
-        i = len(f) - 1
-        revid = ""
-
-        while (f[i] != '_'):
-            revid = revid + f[i]
-            i-=1
-        
-        id = revid[::-1]
-
-        dataframe2 = pd.read_csv(PATH + '/2020-21/player_idlist.csv')
-        name = ""
-        for i in dataframe2.index:
-            if (str(dataframe2.id[i]) == str(id)):
-                name = dataframe2.first_name[i] + " " + dataframe2.second_name[i]
-                break
-
-        if name not in names:
-            newSignings.append(name)
-    
-    print(newSignings)
-    print(len(newSignings))"""
-
-    names1 = []
-    names2 = []
-    names3 = []
-
-    c = conn.cursor()
-    dataframe1 = pd.read_csv(PATH + '/2021-22/player_idlist.csv')
-    for i in dataframe1.index:
-        name1 = dataframe1.first_name[i] + " " + dataframe1.second_name[i]
-        temp_name1 = unidecode(name1, errors='strict')
-        names1.append(temp_name1)
-    
-    dataframe2 = pd.read_csv(PATH + '/2020-21/player_idlist.csv')
-    for i in dataframe2.index:
-        name2 = dataframe2.first_name[i] + " " + dataframe2.second_name[i]
-        temp_name2 = unidecode(name2, errors='strict')
-        names2.append(temp_name2)
-    
-    for val in names1:
-        if val not in names2:
-            names3.append(val)
-    
-    print(names3)
-    print(len(names3))
-    
-
-
-
-
-
-
 def create_connection(db_file):
     conn = None
     try:
@@ -292,7 +232,6 @@ def nltkSA(tweets):
     score = 0
     for tweet in tweets:
         polarity = SentimentIntensityAnalyzer().polarity_scores(tweet)
-        print(polarity)
         score += polarity['compound']
     
     return score/len(tweets)
@@ -302,7 +241,6 @@ def patternSA(tweets):
     score = 0
     for tweet in tweets:
         polarity = sentiment(tweet)
-        print(polarity)
         score += polarity[0]
     
     return score/len(tweets)
@@ -312,7 +250,25 @@ def textblobSA(tweets):
     score = 0
     for tweet in tweets:
         polarity = TextBlob(tweet).sentiment.polarity
-        print(polarity)
+        score += polarity
+    
+    return score/len(tweets)
+
+#CoreNLP Sentiment Analysis
+def coreNLPSA(tweets):
+    score = 0
+    for tweet in tweets:
+        result = nlp.annotate(tweet,
+                   properties={
+                       'annotators': 'sentiment, ner, pos',
+                       'outputFormat': 'json',
+                       'timeout': 1000,
+                   })
+        
+        for s in result["sentences"]:
+            ogpolarity = s["sentimentValue"]
+        
+        polarity = (int(ogpolarity)/2)-1
         score += polarity
     
     return score/len(tweets)
@@ -320,29 +276,16 @@ def textblobSA(tweets):
 
 def main():
     conn = create_connection('fpl.db')
-    #createPlayersTable(conn)
-    #populatePlayersTable(conn)
-
-    #createPlayersTweetsTable(conn)
-    #populatePlayersTweetsTable(conn)
-
-    #createPlayersSumInitialTeam(conn)
-
-    #populatePlayersSumInitialTeamTable(conn)
-
-    #createPlayersTweetsInitialTeam(conn)
-    #populatePlayersTweetsInitialTeam(conn)
-
-    #check(conn)
     tweets = ["I'm not happy about this", "This is terrible", "What a bad day"]
+    print("")
     ans = nltkSA(tweets)
-    print(ans)
-    print("------------------------------")
+    print("NLTK :" + str(ans))
     ans2 = patternSA(tweets)
-    print(ans2)
-    print("------------------------------")
+    print("Pattern :" + str(ans2))
     ans3 = textblobSA(tweets)
-    print(ans3)
-    print((ans+ans2+ans3)/3)
+    print("Textblob :" + str(ans3))
+    ans4 = coreNLPSA(tweets)
+    print("CoreNLP :" + str(ans4))
+    print("Avg: " + str((ans+ans2+ans3+ans4)/4))
 
 main()
