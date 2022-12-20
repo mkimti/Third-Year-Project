@@ -17,6 +17,9 @@ import os
 from textblob import TextBlob
 from pycorenlp import StanfordCoreNLP
 nlp = StanfordCoreNLP('http://localhost:9000')
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoConfig
+from numpy import exp
+import numpy as np
 
 PATH = 'Fantasy-Premier-League/data'
 
@@ -243,7 +246,7 @@ def patternSA(tweets):
         polarity = sentiment(tweet)
         score += polarity[0]
     
-    return score/len(tweets)
+    return np.round(score/len(tweets),4)
 
 #Pattern Sentiment Analysis
 def textblobSA(tweets):
@@ -252,7 +255,7 @@ def textblobSA(tweets):
         polarity = TextBlob(tweet).sentiment.polarity
         score += polarity
     
-    return score/len(tweets)
+    return np.round(score/len(tweets),4)
 
 #CoreNLP Sentiment Analysis
 def coreNLPSA(tweets):
@@ -260,7 +263,7 @@ def coreNLPSA(tweets):
     for tweet in tweets:
         result = nlp.annotate(tweet,
                    properties={
-                       'annotators': 'sentiment, ner, pos',
+                       'annotators': 'sentiment',
                        'outputFormat': 'json',
                        'timeout': 1000,
                    })
@@ -271,7 +274,44 @@ def coreNLPSA(tweets):
         polarity = (int(ogpolarity)/2)-1
         score += polarity
     
-    return score/len(tweets)
+    return np.round(score/len(tweets),4)
+
+def softmax(vector):
+    e = exp(vector)
+    return e/e.sum()
+
+def bert(tweets):
+    MODEL = "cardiffnlp/twitter-roberta-base-sentiment-latest"
+    tokenizer = AutoTokenizer.from_pretrained(MODEL)
+    config = AutoConfig.from_pretrained(MODEL)
+
+    model = AutoModelForSequenceClassification.from_pretrained(MODEL)
+
+    score = 0
+
+    for tweet in tweets:
+        encoded_input = tokenizer(tweet, return_tensors='pt')
+        output = model(**encoded_input)
+
+        scores = output[0][0].detach().numpy()
+        scores = softmax(scores)
+
+        ranking = np.argsort(scores)
+        ranking = ranking[::-1]
+
+        if (config.id2label[ranking[0]] == 'positive'):
+            polarity = np.round(float(scores[ranking[0]]), 4)
+        elif(config.id2label[ranking[0]] == 'negative'):
+            polarity = np.round(-float(scores[ranking[0]]), 4)
+        else:
+            if (config.id2label[ranking[1]] == 'positive'):
+                polarity = np.round(float(scores[ranking[1]]), 4)
+            else:
+                polarity = 0-np.round(float(scores[ranking[1]]), 4)
+        
+        score += polarity
+    
+    return np.round(score/len(tweets),4)
 
 
 def main():
@@ -286,6 +326,8 @@ def main():
     print("Textblob :" + str(ans3))
     ans4 = coreNLPSA(tweets)
     print("CoreNLP :" + str(ans4))
-    print("Avg: " + str((ans+ans2+ans3+ans4)/4))
+    ans5 = bert(tweets)
+    print("BERT :" + str(ans5))
+    print("Avg: " + str(np.round((ans+ans2+ans3+ans4+ans5)/5,4)))
 
 main()
