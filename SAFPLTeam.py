@@ -21,6 +21,7 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification, Auto
 from numpy import exp
 import numpy as np
 
+
 PATH = 'Fantasy-Premier-League/data'
 
 def createPlayersSumInitialTeam(conn):
@@ -29,6 +30,24 @@ def createPlayersSumInitialTeam(conn):
     c.execute("""CREATE TABLE playersSumInitialTeam (
         pID INTEGER,
         ictIndexSum INTEGER,
+        FOREIGN KEY (pID) REFERENCES players(playerId)
+    )""")
+
+    conn.commit()
+
+def createPlayersInitialSA(conn):
+    c = conn.cursor()
+    
+    c.execute("""CREATE TABLE playersInitialSA (
+        SAId INTEGER NOT NULL PRIMARY KEY,
+        pID INTEGER,
+        name TEXT,
+        nltk INTEGER,
+        pattern INTEGER,
+        textblob INTEGER,
+        corenlp INTEGER,
+        bert INTEGER,
+        avg INTEGER,
         FOREIGN KEY (pID) REFERENCES players(playerId)
     )""")
 
@@ -44,6 +63,59 @@ def createPlayersTable(conn):
     )""")
 
     conn.commit()
+
+def createPlayersTweetsTable(conn):
+    c = conn.cursor()
+    c.execute("""CREATE TABLE playersTweets (
+        tweetId INTEGER NOT NULL PRIMARY KEY,
+        playerId INTEGER,
+        gameweek INTEGER,
+        tweet TEXT
+    )""")
+
+def createPlayersTweetsInitialTeam(conn):
+    c = conn.cursor()
+    c.execute("""CREATE TABLE playersTweetsInitialTeam (
+        tweetId INTEGER NOT NULL PRIMARY KEY,
+        pID INTEGER,
+        tweet TEXT,
+        FOREIGN KEY (pID) REFERENCES players(playerId)
+    )""")
+
+    conn.commit()
+
+def populatePlayersInitialSA(conn):
+    c = conn.cursor()
+    with conn:
+        c.execute("SELECT playerId, name FROM players")
+    result = c.fetchall()
+
+    """print("NLTK :" + str(nltkScore))
+    print("Pattern :" + str(patternScore))
+    print("Textblob :" + str(textblobScore))
+    print("CoreNLP :" + str(corenlpScore))
+    print("BERT :" + str(bertScore))
+    print("Avg: " + str(np.round((nltkScore+patternScore+textblobScore+corenlpScore+bertScore)/5,4)))"""
+
+    for tuple in result:
+        worked = False
+        id = tuple[0]
+        name = tuple[1]
+        c.execute("SELECT tweet FROM playersTweetsInitialTeam WHERE pID=?", (id,))
+        tweets = c.fetchall()
+
+        if (len(tweets) != 0):
+            finalTweets = []
+            for tweet in tweets:
+                finalTweets.append(tweet[0])
+            nltkScore = nltkSA(finalTweets)
+            patternScore = patternSA(finalTweets)
+            textblobScore = textblobSA(finalTweets)
+            corenlpScore = coreNLPSA(finalTweets)
+            bertScore = bert(finalTweets)
+            average = np.round((nltkScore+patternScore+textblobScore+corenlpScore+bertScore)/5,4)
+            with conn:
+                c.execute("INSERT INTO playersInitialSA VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?)", (id, name, nltkScore, patternScore, textblobScore, corenlpScore, bertScore, average))
 
 def createPlayersTweetsTable(conn):
     c = conn.cursor()
@@ -316,7 +388,7 @@ def bert(tweets):
 
 def main():
     conn = create_connection('fpl.db')
-    tweets = ["I'm not happy about this", "This is terrible", "What a bad day"]
+    """tweets = ["I'm not happy about this", "This is terrible", "What a bad day"]
     print("")
     ans = nltkSA(tweets)
     print("NLTK :" + str(ans))
@@ -328,6 +400,9 @@ def main():
     print("CoreNLP :" + str(ans4))
     ans5 = bert(tweets)
     print("BERT :" + str(ans5))
-    print("Avg: " + str(np.round((ans+ans2+ans3+ans4+ans5)/5,4)))
+    print("Avg: " + str(np.round((ans+ans2+ans3+ans4+ans5)/5,4)))"""
+    #createPlayersInitialSA(conn)
+    populatePlayersInitialSA(conn)
+
 
 main()
