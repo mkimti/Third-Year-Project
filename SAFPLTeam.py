@@ -59,7 +59,8 @@ def createPlayersTable(conn):
         playerId INTEGER NOT NULL PRIMARY KEY,
         fplName TEXT,
         name TEXT,
-        playerGitId INTEGER
+        playerGitId INTEGER,
+        totalScore INTEGER
     )""")
 
     conn.commit()
@@ -242,6 +243,50 @@ def populatePlayersSumInitialTeamTable(conn):
                 tempPlayerId = c.fetchone()[0] 
                 c.execute("INSERT INTO playersSumInitialTeam VALUES (?, ?)", (tempPlayerId, ict_index_value))
 
+def getTotalScore(conn):
+    c = conn.cursor()
+    with conn:
+        c.execute("SELECT playerId, name FROM players")
+    result = c.fetchall()
+
+    c.execute("SELECT ictIndexSum FROM playersSumInitialTeam ORDER BY ictIndexSum DESC LIMIT 1")
+    maxIctIndex = c.fetchone()[0]
+
+    c.execute("SELECT ictIndexSum FROM playersSumInitialTeam ORDER BY ictIndexSum ASC LIMIT 1")
+    minIctIndex = c.fetchone()[0]
+
+    for tuple in result:
+        workedAvg = False
+        id = tuple[0]
+        name = tuple[1]
+        c.execute("SELECT avg FROM playersInitialSA WHERE pID=?", (id,))
+        try:
+           avg = c.fetchone()[0] 
+           workedAvg = True
+        except:
+            workedAvg = False
+        
+        if (workedAvg == False):
+            avg = 0
+        
+        workedICT = False
+        c.execute("SELECT ictIndexSum FROM playersSumInitialTeam WHERE pID=?", (id,))
+        try:
+           ictIndex = c.fetchone()[0]
+           workedICT = True
+        except:
+            workedICT = False
+        
+        if (workedICT == False):
+            ictIndex = 0
+        
+        normIctIndex = (ictIndex - minIctIndex) / (maxIctIndex - minIctIndex)
+        totalScore = math.ceil(((normIctIndex * 0.4) + (avg * 0.6))*1000)
+
+        with conn:
+            c.execute("UPDATE players SET totalScore = ? WHERE playerId = ?", (totalScore, id))
+        
+
 def create_connection(db_file):
     conn = None
     try:
@@ -402,7 +447,8 @@ def main():
     print("BERT :" + str(ans5))
     print("Avg: " + str(np.round((ans+ans2+ans3+ans4+ans5)/5,4)))"""
     #createPlayersInitialSA(conn)
-    populatePlayersInitialSA(conn)
+    #populatePlayersInitialSA(conn)
+    getTotalScore(conn)
 
 
 main()
