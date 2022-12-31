@@ -20,6 +20,7 @@ nlp = StanfordCoreNLP('http://localhost:9000')
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoConfig
 from numpy import exp
 import numpy as np
+import pulp
 
 
 PATH = 'Fantasy-Premier-League/data'
@@ -280,12 +281,78 @@ def getTotalScore(conn):
         if (workedICT == False):
             ictIndex = 0
         
-        normIctIndex = (ictIndex - minIctIndex) / (maxIctIndex - minIctIndex)
-        totalScore = math.ceil(((normIctIndex * 0.4) + (avg * 0.6))*1000)
+        if (ictIndex < 10):
+            totalScore = 0
+        else:
+            normIctIndex = (ictIndex - minIctIndex) / (maxIctIndex - minIctIndex)
+            totalScore = math.ceil(((normIctIndex * 0.3) + (avg * 0.7))*1000)
 
         with conn:
             c.execute("UPDATE players SET totalScore = ? WHERE playerId = ?", (totalScore, id))
+
+def buildInitialTeam1(conn):
+    dataframe = pd.read_csv(PATH + '/2021-22/players_raw.csv')
+    ids = [int(dataframe.id[i]) for i in dataframe.index]
+    positions = []
+    teams = []
+    names = []
+    scores = []
+    newIds = []
+    costs = []
+
+    c = conn.cursor()
+
+    for id in ids:
+        worked = False
+        with conn:
+            c.execute("SELECT fplName, totalScore FROM players WHERE playerGitId = ?" ,(id,))
+            result = c.fetchall()
         
+        if (len(result) != 0):
+             name = result[0][0]
+             score = result[0][1]
+             names.append(name)
+             scores.append(score)
+             newIds.append(id)
+    
+    for id in newIds:
+        for i in dataframe.index:
+            if int(dataframe.id[i]) == id:
+                positions.append(int(dataframe.element_type[i]))
+                teams.append(int(dataframe.team[i]))
+                costs.append(int(dataframe.now_cost[i]))
+                break
+    
+    #model = pulp.LpProblem("Building_Initial_FPL_Team", pulp.LpMaximize)
+    model = pulp.LpProblem("Building_Initial_FPL_Team", pulp.LpMaximize)
+    in_squad_choice = []
+    for i in range(len(names)):
+        in_squad_choice.append(pulp.LpVariable("x{}".format(i), lowBound=0, upBound=1, cat='Integer'))
+    
+    model += sum(in_squad_choice[i] * scores[i] for i in range(len(names))), "Objective"
+
+    model += sum(in_squad_choice[i] * costs[i] for i in range(len(names))) <= 1000
+
+    model += sum(in_squad_choice) == 15.0
+
+    model += sum(in_squad_choice[i] for i in range(len(names)) if positions[i] == 1) == 2.0
+    model += sum(in_squad_choice[i] for i in range(len(names)) if positions[i] == 2) == 5.0
+    model += sum(in_squad_choice[i] for i in range(len(names)) if positions[i] == 3) == 5.0
+    model += sum(in_squad_choice[i] for i in range(len(names)) if positions[i] == 4) == 3.0
+
+    teamsUniqueSet = set(teams)
+    teamsUnique = list(teamsUniqueSet)
+
+    for teamId in teamsUnique:
+        model += sum(in_squad_choice[i] for i in range(len(names)) if teams[i] == teamId) <= 3.0
+   
+    model.solve()
+    for i in range(len(names)):
+        if (in_squad_choice[i].value() == 1.0):
+            print("Name: " + names[i])
+            print("Score: " + str(scores[i]))
+            print("Cost: " + str(costs[i]))
+            print("-------------------------------")
 
 def create_connection(db_file):
     conn = None
@@ -448,7 +515,8 @@ def main():
     print("Avg: " + str(np.round((ans+ans2+ans3+ans4+ans5)/5,4)))"""
     #createPlayersInitialSA(conn)
     #populatePlayersInitialSA(conn)
-    getTotalScore(conn)
+    #getTotalScore(conn)
+    buildInitialTeam1(conn)
 
 
 main()
