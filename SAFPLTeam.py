@@ -25,6 +25,26 @@ import pulp
 
 PATH = 'Fantasy-Premier-League/data'
 
+def createPlayersSA(conn):
+    c = conn.cursor()
+    
+    c.execute("""CREATE TABLE playersSA (
+        pID INTEGER,
+        name TEXT,
+        nltk INTEGER,
+        pattern INTEGER,
+        textblob INTEGER,
+        corenlp INTEGER,
+        bert INTEGER,
+        avg INTEGER,
+        score INTEGER,
+        gameweek INTEGER,
+        parameterSet TEXT,
+        FOREIGN KEY (pID) REFERENCES players(playerId)
+    )""")
+
+    conn.commit()
+
 def createPlayersSumInitialTeam(conn):
     c = conn.cursor()
     
@@ -73,7 +93,8 @@ def createPlayersTable(conn):
         fplName TEXT,
         name TEXT,
         playerGitId INTEGER,
-        totalScore INTEGER
+        position INTEGER,
+        team INTEGER,
     )""")
 
     conn.commit()
@@ -97,6 +118,51 @@ def createPlayersTweetsInitialTeam(conn):
     )""")
 
     conn.commit()
+
+def createPlayersTweetsTable(conn):
+    c = conn.cursor()
+    c.execute("""CREATE TABLE playersTweets (
+        tweetId INTEGER NOT NULL PRIMARY KEY,
+        playerId INTEGER,
+        gameweek INTEGER,
+        tweet TEXT
+    )""")
+
+def createPlayersTweetsInitialTeam(conn):
+    c = conn.cursor()
+    c.execute("""CREATE TABLE playersTweetsInitialTeam (
+        tweetId INTEGER NOT NULL PRIMARY KEY,
+        pID INTEGER,
+        tweet TEXT,
+        FOREIGN KEY (pID) REFERENCES players(playerId)
+    )""")
+
+    conn.commit()
+
+def populatePlayersSA(conn):
+    c = conn.cursor()
+    with conn:
+        c.execute("SELECT * FROM playersInitialSA")
+    result = c.fetchall()
+
+    for tuple in result:
+        id = tuple[1]
+        name = tuple[2]
+        nltk = tuple[3]
+        pattern = tuple[4]
+        textblob = tuple[5]
+        corenlp = tuple[6]
+        bert = tuple[7]
+        avg = tuple[8]
+
+        with conn:
+            c.execute("SELECT totalScore FROM players WHERE playerId = ?", (id,))
+        score = c.fetchone()[0]
+
+        with conn:
+            c.execute("INSERT INTO playersSA VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (id, name, nltk, pattern, textblob, corenlp, bert, avg, score, 1, "normal"))
+
+
 
 def populatePlayersInitialSA(conn):
     c = conn.cursor()
@@ -124,45 +190,29 @@ def populatePlayersInitialSA(conn):
             with conn:
                 c.execute("INSERT INTO playersInitialSA VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?)", (id, name, nltkScore, patternScore, textblobScore, corenlpScore, bertScore, average))
 
-def createPlayersTweetsTable(conn):
-    c = conn.cursor()
-    c.execute("""CREATE TABLE playersTweets (
-        tweetId INTEGER NOT NULL PRIMARY KEY,
-        playerId INTEGER,
-        gameweek INTEGER,
-        tweet TEXT
-    )""")
-
-def createPlayersTweetsInitialTeam(conn):
-    c = conn.cursor()
-    c.execute("""CREATE TABLE playersTweetsInitialTeam (
-        tweetId INTEGER NOT NULL PRIMARY KEY,
-        pID INTEGER,
-        tweet TEXT,
-        FOREIGN KEY (pID) REFERENCES players(playerId)
-    )""")
-
-    conn.commit()
-
 def populatePlayersIctIndex(conn):
     c = conn.cursor()
     with conn:
         c.execute("SELECT playerId, fplName FROM players")
     result = c.fetchall()
 
-    for i in range(19, 20):
+    for i in range(1, 39):
         dataframe = pd.read_csv(PATH + '/2021-22/gws/gw' + str(i) + '.csv')
         for tuple in result:
             playerId = tuple[0]
             name = tuple[1]
             worked = False
-            for i in dataframe.index:
-                if (unidecode(dataframe.name[i], errors='strict') == name):
+            for j in dataframe.index:
+                if (unidecode(dataframe.name[j], errors='strict') == name):
                     worked = True
+                    ict_index = dataframe.ict_index[j]
                     break
             
             if (worked == False):
-                print(name)
+                ict_index = 0
+            
+            with conn:
+                c.execute("INSERT INTO playersIctIndex VALUES (?, ?, ?)", (playerId, ict_index, i))
 
 
 
@@ -558,13 +608,7 @@ def updatePlayersTable(conn):
 
 def main():
     conn = create_connection('fpl.db')
-    #createPlayersInitialSA(conn)
-    #populatePlayersInitialSA(conn)
-    #getTotalScore(conn)
-    #buildInitialTeam1(conn)
-    #updatePlayersTable(conn)
-    #createPlayersIctIndex(conn)
-    populatePlayersIctIndex(conn)
+    populatePlayersSA(conn)
 
 
 main()
