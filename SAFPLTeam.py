@@ -36,6 +36,18 @@ def createPlayersSumInitialTeam(conn):
 
     conn.commit()
 
+def createPlayersIctIndex(conn):
+    c = conn.cursor()
+    
+    c.execute("""CREATE TABLE playersIctIndex (
+        pID INTEGER,
+        ictIndex INTEGER,
+        gameweek INTEGER,
+        FOREIGN KEY (pID) REFERENCES players(playerId)
+    )""")
+
+    conn.commit()
+
 def createPlayersInitialSA(conn):
     c = conn.cursor()
     
@@ -92,13 +104,6 @@ def populatePlayersInitialSA(conn):
         c.execute("SELECT playerId, name FROM players")
     result = c.fetchall()
 
-    """print("NLTK :" + str(nltkScore))
-    print("Pattern :" + str(patternScore))
-    print("Textblob :" + str(textblobScore))
-    print("CoreNLP :" + str(corenlpScore))
-    print("BERT :" + str(bertScore))
-    print("Avg: " + str(np.round((nltkScore+patternScore+textblobScore+corenlpScore+bertScore)/5,4)))"""
-
     for tuple in result:
         worked = False
         id = tuple[0]
@@ -138,6 +143,28 @@ def createPlayersTweetsInitialTeam(conn):
     )""")
 
     conn.commit()
+
+def populatePlayersIctIndex(conn):
+    c = conn.cursor()
+    with conn:
+        c.execute("SELECT playerId, fplName FROM players")
+    result = c.fetchall()
+
+    for i in range(19, 20):
+        dataframe = pd.read_csv(PATH + '/2021-22/gws/gw' + str(i) + '.csv')
+        for tuple in result:
+            playerId = tuple[0]
+            name = tuple[1]
+            worked = False
+            for i in dataframe.index:
+                if (unidecode(dataframe.name[i], errors='strict') == name):
+                    worked = True
+                    break
+            
+            if (worked == False):
+                print(name)
+
+
 
 def populatePlayersTweetsInitialTeam(conn):
     c = conn.cursor()
@@ -291,6 +318,7 @@ def getTotalScore(conn):
             c.execute("UPDATE players SET totalScore = ? WHERE playerId = ?", (totalScore, id))
 
 def buildInitialTeam1(conn):
+    truePositions = ["Goalkeeper", "Defender", "Midfielder", "Forward"]
     dataframe = pd.read_csv(PATH + '/2021-22/players_raw.csv')
     ids = [int(dataframe.id[i]) for i in dataframe.index]
     positions = []
@@ -323,7 +351,6 @@ def buildInitialTeam1(conn):
                 costs.append(int(dataframe.now_cost[i]))
                 break
     
-    #model = pulp.LpProblem("Building_Initial_FPL_Team", pulp.LpMaximize)
     model = pulp.LpProblem("Building_Initial_FPL_Team", pulp.LpMaximize)
     in_squad_choice = []
     for i in range(len(names)):
@@ -352,6 +379,7 @@ def buildInitialTeam1(conn):
             print("Name: " + names[i])
             print("Score: " + str(scores[i]))
             print("Cost: " + str(costs[i]))
+            print("Position: " + truePositions[positions[i]-1])
             print("-------------------------------")
 
 def create_connection(db_file):
@@ -497,26 +525,46 @@ def bert(tweets):
     
     return np.round(score/len(tweets),4)
 
+def updatePlayersTable(conn):
+    dataframe = pd.read_csv(PATH + '/2021-22/players_raw.csv')
+    c = conn.cursor()
+
+    with conn:
+        c.execute("SELECT playerId, playerGitId FROM players")
+        result = c.fetchall()
+    
+    for tuple in result:
+        playerId = tuple[0]
+        playerGitId = tuple[1]
+
+        worked = False
+        
+        for i in dataframe.index:
+            if int(dataframe.id[i]) == playerGitId:
+                worked = True
+                position = int(dataframe.element_type[i])
+                team = int(dataframe.team[i])
+                break
+        
+        if (worked == True):
+            with conn:
+                c.execute("UPDATE players SET position = ?, team = ? WHERE playerId = ?", (position, team, playerId))
+        else:
+            print("issue with: " + playerId)
+
+        
+
+
 
 def main():
     conn = create_connection('fpl.db')
-    """tweets = ["I'm not happy about this", "This is terrible", "What a bad day"]
-    print("")
-    ans = nltkSA(tweets)
-    print("NLTK :" + str(ans))
-    ans2 = patternSA(tweets)
-    print("Pattern :" + str(ans2))
-    ans3 = textblobSA(tweets)
-    print("Textblob :" + str(ans3))
-    ans4 = coreNLPSA(tweets)
-    print("CoreNLP :" + str(ans4))
-    ans5 = bert(tweets)
-    print("BERT :" + str(ans5))
-    print("Avg: " + str(np.round((ans+ans2+ans3+ans4+ans5)/5,4)))"""
     #createPlayersInitialSA(conn)
     #populatePlayersInitialSA(conn)
     #getTotalScore(conn)
-    buildInitialTeam1(conn)
+    #buildInitialTeam1(conn)
+    #updatePlayersTable(conn)
+    #createPlayersIctIndex(conn)
+    populatePlayersIctIndex(conn)
 
 
 main()
