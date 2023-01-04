@@ -95,6 +95,7 @@ def createPlayersTable(conn):
         playerGitId INTEGER,
         position INTEGER,
         team INTEGER,
+        totalScore INTEGER
     )""")
 
     conn.commit()
@@ -142,27 +143,51 @@ def createPlayersTweetsInitialTeam(conn):
 def populatePlayersSA(conn):
     c = conn.cursor()
     with conn:
-        c.execute("SELECT * FROM playersInitialSA")
+        c.execute("SELECT * FROM players")
     result = c.fetchall()
 
     for tuple in result:
-        id = tuple[1]
-        name = tuple[2]
-        nltk = tuple[3]
-        pattern = tuple[4]
-        textblob = tuple[5]
-        corenlp = tuple[6]
-        bert = tuple[7]
-        avg = tuple[8]
-
+        worked = False
+        id = tuple[0]
+        name = tuple[1]
+        score = tuple[6]
+        
         with conn:
-            c.execute("SELECT totalScore FROM players WHERE playerId = ?", (id,))
-        score = c.fetchone()[0]
+            c.execute("SELECT * FROM playersInitialSA WHERE pID = ?", (id,))
+        result = c.fetchall()
 
-        with conn:
-            c.execute("INSERT INTO playersSA VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (id, name, nltk, pattern, textblob, corenlp, bert, avg, score, 1, "normal"))
+        if (len(result)) == 0:
+            with conn:
+                c.execute("INSERT INTO playersSA VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (id, name, 0, 0, 0, 0, 0, 0, score, 1, "normal"))
+        else:
+            nltk = result[0][3]
+            pattern = result[0][4]
+            textblob = result[0][5]
+            corenlp = result[0][6]
+            bert = result[0][7]
+            avg = result[0][8] 
 
+            with conn:
+                c.execute("INSERT INTO playersSA VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (id, name, nltk, pattern, textblob, corenlp, bert, avg, score, 1, "normal"))
 
+def findingPenalty():
+    total = 0
+    for i in range(1, 39):
+        dataframe = pd.read_csv(PATH + '/2021-22/gws/gw' + str(i) + '.csv')
+        points = [dataframe.total_points[k] for k in dataframe.index]
+        count = 0
+        for j in range(len(points)):
+            if points[j] >= 4:
+                count+=1
+        
+        fraction = count/len(points)
+        print("GW: " + str(i))
+        print("Count: " + str(count))
+        print("Total: " + str(len(points)))
+        print("Percentage: " + str(math.ceil(fraction*100)) + "%")
+        total += fraction
+    
+    print(str(math.ceil((total/38)*100)) + "%")
 
 def populatePlayersInitialSA(conn):
     c = conn.cursor()
@@ -608,7 +633,11 @@ def updatePlayersTable(conn):
 
 def main():
     conn = create_connection('fpl.db')
-    populatePlayersSA(conn)
+    #populatePlayersSA(conn)
+    #findingPenalty()
+    #getTotalScore(conn)
+    #populatePlayersSA(conn)
+    findingPenalty()
 
 
 main()
