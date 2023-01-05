@@ -28,7 +28,7 @@ PATH = 'Fantasy-Premier-League/data'
 def createPlayersSA(conn):
     c = conn.cursor()
     
-    c.execute("""CREATE TABLE playersSA (
+    c.execute("""CREATE TABLE playersSANormal (
         pID INTEGER,
         name TEXT,
         nltk INTEGER,
@@ -39,7 +39,6 @@ def createPlayersSA(conn):
         avg INTEGER,
         score INTEGER,
         gameweek INTEGER,
-        parameterSet TEXT,
         FOREIGN KEY (pID) REFERENCES players(playerId)
     )""")
 
@@ -100,38 +99,18 @@ def createPlayersTable(conn):
 
     conn.commit()
 
-def createPlayersTweetsTable(conn):
+def createPlayersTweetsNormal(conn):
     c = conn.cursor()
-    c.execute("""CREATE TABLE playersTweets (
+    c.execute("""CREATE TABLE playersTweetsNormal (
         tweetId INTEGER NOT NULL PRIMARY KEY,
         playerId INTEGER,
         gameweek INTEGER,
         tweet TEXT
     )""")
 
-def createPlayersTweetsInitialTeam(conn):
+def createPlayersTweetsInitialTeamNormal(conn):
     c = conn.cursor()
-    c.execute("""CREATE TABLE playersTweetsInitialTeam (
-        tweetId INTEGER NOT NULL PRIMARY KEY,
-        pID INTEGER,
-        tweet TEXT,
-        FOREIGN KEY (pID) REFERENCES players(playerId)
-    )""")
-
-    conn.commit()
-
-def createPlayersTweetsTable(conn):
-    c = conn.cursor()
-    c.execute("""CREATE TABLE playersTweets (
-        tweetId INTEGER NOT NULL PRIMARY KEY,
-        playerId INTEGER,
-        gameweek INTEGER,
-        tweet TEXT
-    )""")
-
-def createPlayersTweetsInitialTeam(conn):
-    c = conn.cursor()
-    c.execute("""CREATE TABLE playersTweetsInitialTeam (
+    c.execute("""CREATE TABLE playersTweetsInitialTeamNormal (
         tweetId INTEGER NOT NULL PRIMARY KEY,
         pID INTEGER,
         tweet TEXT,
@@ -449,6 +428,7 @@ def buildInitialTeam1(conn):
         model += sum(in_squad_choice[i] for i in range(len(names)) if teams[i] == teamId) <= 3.0
    
     model.solve()
+    total_cost = 0
     for i in range(len(names)):
         if (in_squad_choice[i].value() == 1.0):
             print("Name: " + names[i])
@@ -456,6 +436,10 @@ def buildInitialTeam1(conn):
             print("Cost: " + str(costs[i]))
             print("Position: " + truePositions[positions[i]-1])
             print("-------------------------------")
+            total_cost += costs[i]
+    
+    print("Total Spent: " + str(total_cost))
+    print("Budget Remaining for Next Week: " + str(1000-total_cost))
 
 def create_connection(db_file):
     conn = None
@@ -637,7 +621,8 @@ def main():
     #findingPenalty()
     #getTotalScore(conn)
     #populatePlayersSA(conn)
-    findingPenalty()
+    #findingPenalty()
+    buildInitialTeam1(conn)
 
 
 main()
