@@ -25,6 +25,56 @@ import pulp
 
 PATH = 'Fantasy-Premier-League/data'
 
+def createSquadsNormal(conn):
+    c = conn.cursor()
+    
+    c.execute("""CREATE TABLE squadsNormal (
+        playerId INTEGER,
+        playerGitId INTEGER,
+        name TEXT,
+        gw1 INTEGER,
+        gw2 INTEGER,
+        gw3 INTEGER,
+        gw4 INTEGER,
+        gw5 INTEGER,
+        gw6 INTEGER,
+        gw7 INTEGER,
+        gw8 INTEGER,
+        gw9 INTEGER,
+        gw10 INTEGER,
+        gw11 INTEGER,
+        gw12 INTEGER,
+        gw13 INTEGER,
+        gw14 INTEGER,
+        gw15 INTEGER,
+        gw16 INTEGER,
+        gw17 INTEGER,
+        gw18 INTEGER,
+        gw19 INTEGER,
+        gw20 INTEGER,
+        gw21 INTEGER,
+        gw22 INTEGER,
+        gw23 INTEGER,
+        gw24 INTEGER,
+        gw25 INTEGER,
+        gw26 INTEGER,
+        gw27 INTEGER,
+        gw28 INTEGER,
+        gw29 INTEGER,
+        gw30 INTEGER,
+        gw31 INTEGER,
+        gw32 INTEGER,
+        gw33 INTEGER,
+        gw34 INTEGER,
+        gw35 INTEGER,
+        gw36 INTEGER,
+        gw37 INTEGER,
+        gw38 INTEGER,
+        FOREIGN KEY (playerId) REFERENCES players(playerId)
+    )""")
+
+    conn.commit()
+
 def createPlayersSA(conn):
     c = conn.cursor()
     
@@ -167,6 +217,20 @@ def findingPenalty():
         total += fraction
     
     print(str(math.ceil((total/38)*100)) + "%")
+
+def populateSquadsNormal(conn):
+    c = conn.cursor()
+    with conn:
+        c.execute("SELECT playerId, name, playerGitId FROM players")
+    result = c.fetchall()
+
+    for tuple in result:
+        playerId = tuple[0]
+        name = tuple[1]
+        playerGitId = tuple[2]
+
+        with conn:
+            c.execute("INSERT INTO squadsNormal VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)", (playerId, playerGitId, name))
 
 def populatePlayersInitialSA(conn):
     c = conn.cursor()
@@ -405,15 +469,21 @@ def buildInitialTeam1(conn):
                 costs.append(int(dataframe.now_cost[i]))
                 break
     
+    #Define LP Model
     model = pulp.LpProblem("Building_Initial_FPL_Team", pulp.LpMaximize)
+
+    #Define Variables
     in_squad_choice = []
     for i in range(len(names)):
         in_squad_choice.append(pulp.LpVariable("x{}".format(i), lowBound=0, upBound=1, cat='Integer'))
     
+    #Define Objective
     model += sum(in_squad_choice[i] * scores[i] for i in range(len(names))), "Objective"
 
+    #Monetary Constraints
     model += sum(in_squad_choice[i] * costs[i] for i in range(len(names))) <= 1000
 
+    #Squad Constraints
     model += sum(in_squad_choice) == 15.0
 
     model += sum(in_squad_choice[i] for i in range(len(names)) if positions[i] == 1) == 2.0
@@ -427,6 +497,7 @@ def buildInitialTeam1(conn):
     for teamId in teamsUnique:
         model += sum(in_squad_choice[i] for i in range(len(names)) if teams[i] == teamId) <= 3.0
    
+    #Solve LP Problem
     model.solve()
     total_cost = 0
     for i in range(len(names)):
@@ -547,10 +618,12 @@ def coreNLPSA(tweets):
     
     return np.round(score/len(tweets),4)
 
+#Softmax Activation Function used in BERT
 def softmax(vector):
     e = exp(vector)
     return e/e.sum()
 
+#BERT Sentiment Analysis
 def bert(tweets):
     MODEL = "cardiffnlp/twitter-roberta-base-sentiment-latest"
     tokenizer = AutoTokenizer.from_pretrained(MODEL)
@@ -617,12 +690,8 @@ def updatePlayersTable(conn):
 
 def main():
     conn = create_connection('fpl.db')
-    #populatePlayersSA(conn)
-    #findingPenalty()
-    #getTotalScore(conn)
-    #populatePlayersSA(conn)
-    #findingPenalty()
-    buildInitialTeam1(conn)
+    #buildInitialTeam1(conn)
+    populateSquadsNormal(conn)
 
 
 main()
