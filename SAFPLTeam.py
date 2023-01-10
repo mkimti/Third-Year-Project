@@ -105,6 +105,19 @@ def createPlayersSumInitialTeam(conn):
 
     conn.commit()
 
+def createBoughtValueNormal(conn):
+    c = conn.cursor()
+    
+    c.execute("""CREATE TABLE boughtValueNormal (
+        playerId INTEGER,
+        playerGitId INTEGER,
+        name TEXT,
+        boughtValue INTEGER,
+        FOREIGN KEY (playerId) REFERENCES players(playerId)
+    )""")
+
+    conn.commit()
+
 def createPlayersIctIndex(conn):
     c = conn.cursor()
     
@@ -113,6 +126,17 @@ def createPlayersIctIndex(conn):
         ictIndex INTEGER,
         gameweek INTEGER,
         FOREIGN KEY (pID) REFERENCES players(playerId)
+    )""")
+
+    conn.commit()
+
+def createPerformanceNormal(conn):
+    c = conn.cursor()
+    
+    c.execute("""CREATE TABLE performanceNormal (
+        budget INTEGER,
+        totalPoints INTEGER,
+        gameweek INTEGER
     )""")
 
     conn.commit()
@@ -231,6 +255,20 @@ def populateSquadsNormal(conn):
 
         with conn:
             c.execute("INSERT INTO squadsNormal VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)", (playerId, playerGitId, name))
+
+def populateBoughtValueNormal(conn):
+    c = conn.cursor()
+    with conn:
+        c.execute("SELECT playerId, name, playerGitId FROM players")
+    result = c.fetchall()
+
+    for tuple in result:
+        playerId = tuple[0]
+        name = tuple[1]
+        playerGitId = tuple[2]
+
+        with conn:
+            c.execute("INSERT INTO boughtValueNormal VALUES (?, ?, ?, -1)", (playerId, playerGitId, name))
 
 def populatePlayersInitialSA(conn):
     c = conn.cursor()
@@ -435,7 +473,7 @@ def getTotalScore(conn):
         with conn:
             c.execute("UPDATE players SET totalScore = ? WHERE playerId = ?", (totalScore, id))
 
-def buildInitialTeam1(conn):
+def buildInitialTeamNormal(conn):
     truePositions = ["Goalkeeper", "Defender", "Midfielder", "Forward"]
     dataframe = pd.read_csv(PATH + '/2021-22/players_raw.csv')
     ids = [int(dataframe.id[i]) for i in dataframe.index]
@@ -449,25 +487,31 @@ def buildInitialTeam1(conn):
     c = conn.cursor()
 
     for id in ids:
-        worked = False
         with conn:
-            c.execute("SELECT fplName, totalScore FROM players WHERE playerGitId = ?" ,(id,))
+            c.execute("SELECT fplName, team, position, playerId FROM players WHERE playerGitId = ?" ,(id,))
             result = c.fetchall()
         
         if (len(result) != 0):
-             name = result[0][0]
-             score = result[0][1]
-             names.append(name)
-             scores.append(score)
-             newIds.append(id)
+            name = result[0][0]
+            team = result[0][1]
+            position = result[0][2]
+            playerId = result[0][3]
+            names.append(name)
+            teams.append(team)
+            positions.append(position)
+            newIds.append(id)
+
+            with conn:
+                c.execute("SELECT score FROM playersSANormal WHERE pID = ? AND gameweek = ?" ,(playerId, 1))
+                result2 = c.fetchall()
+            
+            score = result2[0][0]
+            scores.append(score)
     
-    for id in newIds:
-        for i in dataframe.index:
-            if int(dataframe.id[i]) == id:
-                positions.append(int(dataframe.element_type[i]))
-                teams.append(int(dataframe.team[i]))
-                costs.append(int(dataframe.now_cost[i]))
-                break
+            for i in dataframe.index:
+                if int(dataframe.id[i]) == id:
+                    costs.append(int(dataframe.now_cost[i]))
+                    break
     
     #Define LP Model
     model = pulp.LpProblem("Building_Initial_FPL_Team", pulp.LpMaximize)
@@ -690,8 +734,9 @@ def updatePlayersTable(conn):
 
 def main():
     conn = create_connection('fpl.db')
-    #buildInitialTeam1(conn)
-    populateSquadsNormal(conn)
+    buildInitialTeamNormal(conn)
+    #populateBoughtValueNormal(conn)
+    #createPerformanceNormal(conn)
 
 
 main()
