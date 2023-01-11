@@ -543,18 +543,32 @@ def buildInitialTeamNormal(conn):
    
     #Solve LP Problem
     model.solve()
+    #total_cost = 0
+    #for i in range(len(names)):
+        #if (in_squad_choice[i].value() == 1.0):
+            #print("Name: " + names[i])
+            #print("Score: " + str(scores[i]))
+            #print("Cost: " + str(costs[i]))
+            #print("Position: " + truePositions[positions[i]-1])
+            #print("-------------------------------")
+            #total_cost += costs[i]
+    
+    #print("Total Spent: " + str(total_cost))
+    #print("Budget Remaining for Next Week: " + str(1000-total_cost))
     total_cost = 0
     for i in range(len(names)):
         if (in_squad_choice[i].value() == 1.0):
-            print("Name: " + names[i])
-            print("Score: " + str(scores[i]))
-            print("Cost: " + str(costs[i]))
-            print("Position: " + truePositions[positions[i]-1])
-            print("-------------------------------")
+            id = newIds[i]
+            cost = costs[i]
+            #with conn:
+                #c.execute("UPDATE squadsNormal SET gw1 = 1 WHERE playerGitId = ?", (id,))
+                #c.execute("UPDATE boughtValueNormal SET boughtValue = ? WHERE playerGitId = ?", (cost, id))
             total_cost += costs[i]
     
-    print("Total Spent: " + str(total_cost))
-    print("Budget Remaining for Next Week: " + str(1000-total_cost))
+    budget = 1000-total_cost
+    with conn:
+        c.execute("INSERT INTO performanceNormal VALUES (?, 0, 1)", (budget,))
+        
 
 def create_connection(db_file):
     conn = None
